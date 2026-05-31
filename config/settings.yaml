@@ -1,0 +1,40 @@
+# Agent settings. Sensible defaults — edit if you like.
+
+models:
+  # Defaults used when a session starts (the user can switch any of these in chat).
+  # 'chat'   -> conversational agent + extracting structured info from job pages.
+  # 'tailor' -> the higher-stakes resume tailoring step. Opus = best quality.
+  chat: "claude-sonnet-4-6"
+  tailor: "claude-opus-4-8"
+
+# Models the agent can switch between via chat. Add/rename freely — the agent
+# reads this list when you ask "what models can I use?". The key is the short
+# alias you say in chat; the value is the full model id sent to the API.
+model_aliases:
+  opus: "claude-opus-4-8"
+  sonnet: "claude-sonnet-4-6"
+  haiku: "claude-haiku-4-5"
+
+# Only consider jobs located in the United States. Non-US jobs are skipped
+# with a logged reason.
+us_jobs_only: true
+
+# Tailored resumes must fit within this many pages (the tailor loop trims to fit).
+max_resume_pages: 1
+
+# OPTIONAL override list. Every link is assessed LIVE by default — the agent
+# loads the actual form and decides if auto-fill is doable (login wall, multi-step,
+# CAPTCHA, or a standard fillable form). Add an ATS key here only if you want to
+# force-skip it regardless (e.g. "workday"). Empty = judge everything on the fly.
+# The auto-fill browser never logs in or uses your cookies, so your accounts are
+# never touched. Valid keys: linkedin, workday, indeed, avature, greenhouse, lever, ashby.
+do_not_automate: []
+
+# Where tailored resumes + application results are written.
+results_dir: "results"
+
+# Folder you drop your base .tex resumes into (pick one per session in the UI).
+base_resumes_dir: "base_resumes"
+
+# Max characters of job-description text to send to the model (keeps cost sane).
+max_job_description_chars: 12000

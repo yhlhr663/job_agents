@@ -1,0 +1,45 @@
+% Sample base resume — REPLACE with your own .tex (or add more files here).
+% Compiles with: tectonic sample_resume.tex
+\documentclass[letterpaper,11pt]{article}
+\usepackage[margin=0.75in]{geometry}
+\usepackage{enumitem}
+\usepackage{titlesec}
+\usepackage[hidelinks]{hyperref}
+\pagestyle{empty}
+\setlist[itemize]{leftmargin=1.2em,topsep=2pt,itemsep=1pt}
+\titleformat{\section}{\large\bfseries}{}{0em}{}[\titlerule]
+\titlespacing{\section}{0pt}{8pt}{4pt}
+
+\newcommand{\role}[4]{\textbf{#1} \hfill #2 \\ \textit{#3} \hfill \textit{#4}}
+
+\begin{document}
+
+\begin{center}
+  {\LARGE \textbf{Jane Doe}}\\[2pt]
+  San Francisco, CA $\cdot$ jane.doe@email.com $\cdot$ (555) 123-4567 $\cdot$
+  \href{https://github.com/janedoe}{github.com/janedoe}
+\end{center}
+
+\section{Summary}
+Software engineer with experience building backend services and data pipelines.
+
+\section{Experience}
+\role{Software Engineer}{2022--Present}{Acme Corp}{San Francisco, CA}
+\begin{itemize}
+  \item Built and operated REST APIs in Python serving 2M requests/day.
+  \item Designed a data pipeline reducing nightly batch time by 40\%.
+  \item Mentored two junior engineers and led code-review practices.
+\end{itemize}
+
+\role{Software Engineer Intern}{Summer 2021}{Beta Inc}{Remote}
+\begin{itemize}
+  \item Implemented a caching layer that cut p95 latency from 800ms to 120ms.
+\end{itemize}
+
+\section{Education}
+\role{B.S. Computer Science}{2022}{State University}{}
+
+\section{Skills}
+Python, SQL, Go, Docker, Kubernetes, AWS, PostgreSQL, Redis.
+
+\end{document}

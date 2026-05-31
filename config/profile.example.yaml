@@ -1,0 +1,39 @@
+# Copy this to profile.yaml and fill in your info (profile.yaml is gitignored).
+# The agent uses this to tailor resumes and answer application form questions.
+
+# --- Basics -----------------------------------------------------------------
+full_name: ""
+email: ""
+phone: ""
+
+location:
+  city: ""
+  state: ""
+  country: "United States"
+
+links:
+  linkedin: ""
+  github: ""
+  portfolio: ""
+  other: ""
+
+# --- Work authorization (US) ------------------------------------------------
+work_authorization:
+  authorized_to_work_in_us: true
+  requires_sponsorship: false
+  status_note: ""
+
+# --- Equal Opportunity / EEO (all optional) ---------------------------------
+eeo:
+  gender: "Decline to self-identify"
+  race_ethnicity: "Decline to self-identify"
+  veteran_status: "Decline to self-identify"
+  disability_status: "Decline to self-identify"
+  hispanic_latino: "Decline to self-identify"
+
+# --- Misc form answers ------------------------------------------------------
+preferences:
+  earliest_start_date: ""
+  desired_salary: ""
+  willing_to_relocate: true
+  notes: ""

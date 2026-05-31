@@ -1,0 +1,24 @@
+# Secrets & personal info
+.env
+# your real profile (use config/profile.example.yaml as the template)
+config/profile.yaml
+
+# Personal resumes — keep the generic sample, ignore everything else
+base_resumes/*.tex
+!base_resumes/sample_resume.tex
+
+# Generated / runtime data
+results/*
+!results/.gitkeep
+data/
+static/
+
+# Local / editor / OS
+.claude/
+__pycache__/
+*.pyc
+.DS_Store
+.venv/
+venv/
+*.log
+.streamlit/secrets.toml
