@@ -36,6 +36,10 @@ class Job:
     tailored_pdf_path: str = ""       # path to compiled PDF (temp until saved)
     base_resume_name: str = ""        # which base resume was used
     cover_letter_path: str = ""       # optional generated cover letter (PDF)
+    # --- confirmed answers to custom application questions ------------------
+    # [{"question": str, "answer": str}] — drafted by the agent, confirmed by
+    # the user in chat, then auto-filled into the form.
+    custom_answers: list = field(default_factory=list)
     # --- result -------------------------------------------------------------
     result_path: str = ""             # final saved results/<Company>/<Job>.md
 

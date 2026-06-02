@@ -28,7 +28,7 @@ from src.applicator import apply_url, assess_doability, categorize, policy_block
 from src.config import do_not_automate
 from src.models import Job
 from src.pw_forms import (detect_login_wall, detect_multistep, enumerate_fields,
-                          has_captcha, list_file_inputs)
+                          enumerate_radio_groups, has_captcha, list_file_inputs)
 
 
 def job_from_dict(d: dict) -> Job:
@@ -80,6 +80,16 @@ def main():
                     result["custom_questions"].append({**f, "category": category})
                 else:                    # truly custom question
                     result["custom_questions"].append(f)
+            # Single-choice (radio) questions, grouped so Yes/No shows once.
+            for g in enumerate_radio_groups(page):
+                label = g["question"] or g["name"]
+                entry = {"label": label, "kind": "radio", "required": g["required"],
+                         "options": [o["label"] for o in g["options"] if o["label"]]}
+                category, covered = categorize(label)
+                if category and covered:
+                    result["profile_fields"].append({**entry, "category": category})
+                else:
+                    result["custom_questions"].append({**entry, "category": category})
             browser.close()
 
         num_fields = len(result["profile_fields"]) + len(result["custom_questions"])

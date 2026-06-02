@@ -74,6 +74,38 @@ TOOLS = [
         },
     },
     {
+        "name": "answer_questions",
+        "description": "Save the user-confirmed answers to a job's free-text/essay "
+                       "application questions — the ones inspect_requirements returned "
+                       "under 'essay_questions_to_draft'. Call this ONLY after you've "
+                       "drafted answers, shown them to the user, and they confirmed or "
+                       "edited them. These answers get auto-filled when the user clicks "
+                       "Auto-fill. Do NOT use this for single-choice questions — the user "
+                       "answers those themselves in the browser. Pass the 1-based job "
+                       "number and a list of {question, answer}.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "index": {"type": "integer", "description": "1-based job number."},
+                "answers": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "question": {"type": "string",
+                                         "description": "The question text, matching the form label."},
+                            "answer": {"type": "string",
+                                       "description": "The confirmed answer (an exact option for "
+                                                      "single-choice questions)."},
+                        },
+                        "required": ["question", "answer"],
+                    },
+                },
+            },
+            "required": ["index", "answers"],
+        },
+    },
+    {
         "name": "recall_knowledge",
         "description": "Recall what the agent has learned over time about how different "
                        "ATS platforms behave (doable/not and why). Use when the user asks "
@@ -346,16 +378,43 @@ class AgentContext:
                 "multistep": info.get("multistep"),
                 "documents": info.get("documents", []),
                 "auto_fillable_fields": [f.get("category") for f in info.get("profile_fields", [])],
-                "needs_your_input": [
-                    {"question": f.get("label"),
-                     "required": f.get("required"),
-                     "category": f.get("category")}
+                # Free-text questions the agent should DRAFT answers for.
+                "essay_questions_to_draft": [
+                    {"question": f.get("label"), "required": f.get("required")}
                     for f in info.get("custom_questions", [])
+                    if f.get("kind") in ("text", "textarea", "email", "tel", "url", None)
                 ],
+                # Single-choice questions the USER answers themselves in the browser.
+                "single_choice_questions_user_answers": [
+                    {"question": f.get("label"), "required": f.get("required"),
+                     "options": f.get("options", [])}
+                    for f in info.get("custom_questions", [])
+                    if f.get("kind") in ("radio", "select", "checkbox")
+                ],
+                # Material for drafting the essay answers above.
+                "job_description": (job.description or "")[:6000],
+                "your_profile": config.load_profile(),
                 "learned_something_new": learned,
                 "note": info.get("message", ""),
             })
         return json.dumps(out, indent=2)
+
+    def _answer_questions(self, index: int, answers: list[dict]) -> str:
+        if index < 1 or index > len(self.jobs):
+            return json.dumps({"index": index, "result": "no such job number"})
+        job = self.jobs[index - 1]
+        clean = [{"question": (a.get("question") or "").strip(),
+                  "answer": (a.get("answer") or "").strip()}
+                 for a in (answers or [])
+                 if (a.get("question") or "").strip() and (a.get("answer") or "").strip()]
+        # Merge by question text (replace existing answer, keep others).
+        by_q = {a["question"].lower(): a for a in job.custom_answers}
+        for a in clean:
+            by_q[a["question"].lower()] = a
+        job.custom_answers = list(by_q.values())
+        return json.dumps({"index": index, "saved": len(clean),
+                           "total_on_file": len(job.custom_answers),
+                           "note": "These will be auto-filled when the user clicks Auto-fill."})
 
     def _recall_knowledge(self) -> str:
         return json.dumps(knowledge.summary() or {"note": "Nothing learned yet."}, indent=2)
@@ -473,6 +532,8 @@ class AgentContext:
             return self._add_jobs(args.get("urls", []))
         if name == "inspect_requirements":
             return self._inspect_requirements(args.get("indices", []))
+        if name == "answer_questions":
+            return self._answer_questions(args.get("index", 0), args.get("answers", []))
         if name == "recall_knowledge":
             return self._recall_knowledge()
         if name == "list_jobs":

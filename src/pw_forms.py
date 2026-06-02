@@ -44,22 +44,102 @@ def is_required(el) -> bool:
 
 
 def enumerate_fields(page) -> list[dict]:
-    """Read-only: list every meaningful form field on the page."""
+    """Read-only: list every meaningful text/textarea/select field on the page.
+
+    Radio/checkbox groups are reported separately by enumerate_radio_groups()
+    so a Yes/No question appears once (with its options) rather than as N rows.
+    """
     out = []
     for el in page.query_selector_all("input, textarea, select"):
         try:
             tag = el.evaluate("e => e.tagName.toLowerCase()")
             etype = (el.get_attribute("type") or "").lower()
-            if tag == "input" and etype in SKIP_INPUT_TYPES:
+            if tag == "input" and (etype in SKIP_INPUT_TYPES or etype in ("radio", "checkbox")):
                 continue
             label = field_key(el)
             if not label or any(n in label.lower() for n in NOISE_LABELS):
                 continue
             kind = "select" if tag == "select" else ("textarea" if tag == "textarea" else (etype or "text"))
-            out.append({"label": label, "kind": kind, "required": is_required(el)})
+            entry = {"label": label, "kind": kind, "required": is_required(el)}
+            if tag == "select":
+                entry["options"] = _select_option_texts(el)
+            out.append(entry)
         except Exception:
             continue
     return out
+
+
+# JS helpers reused for reading and (later) filling single-choice questions. ---
+_OPTION_LABEL_JS = """(el) => {
+  if (el.id) { const l = document.querySelector(`label[for="${CSS.escape(el.id)}"]`);
+               if (l && l.innerText.trim()) return l.innerText.trim(); }
+  const p = el.closest('label'); if (p && p.innerText.trim()) return p.innerText.trim();
+  const al = el.getAttribute('aria-label'); if (al) return al.trim();
+  return el.getAttribute('value') || '';
+}"""
+
+_GROUP_QUESTION_JS = """(el) => {
+  const clean = (t) => (t || '').replace(/\\s+/g, ' ').trim();
+  const fs = el.closest('fieldset');
+  if (fs) { const lg = fs.querySelector('legend'); if (lg && clean(lg.innerText)) return clean(lg.innerText); }
+  const grp = el.closest('[role=radiogroup],[role=group]');
+  if (grp) {
+    const lb = grp.getAttribute('aria-labelledby');
+    if (lb) { const n = document.getElementById(lb); if (n && clean(n.innerText)) return clean(n.innerText); }
+    const al = grp.getAttribute('aria-label'); if (al) return clean(al);
+  }
+  let node = el;
+  for (let i = 0; i < 6 && node; i++) {
+    node = node.parentElement; if (!node) break;
+    const cand = node.querySelector(
+      'label, legend, h1,h2,h3,h4,h5,h6, [class*=label], [class*=Label], [class*=question], [class*=Question], [class*=title], [class*=Title]');
+    if (cand) { const t = clean(cand.innerText);
+      if (t && t.length > 3 && t.length < 300 && !/^(yes|no)$/i.test(t)) return t; }
+  }
+  return el.getAttribute('name') || '';
+}"""
+
+
+def _select_option_texts(el) -> list[str]:
+    try:
+        return el.evaluate(
+            "(s) => Array.from(s.options).map(o => o.innerText.trim()).filter(Boolean)")
+    except Exception:
+        return []
+
+
+def enumerate_radio_groups(page) -> list[dict]:
+    """Group radio buttons by `name` into single-choice questions.
+
+    Returns [{name, question, required, options:[{label, value}]}] — the
+    question text is recovered from a fieldset legend / aria-label / nearby
+    label, falling back to the input's `name`.
+    """
+    groups: dict[str, dict] = {}
+    for el in page.query_selector_all("input[type=radio]"):
+        try:
+            name = el.get_attribute("name") or ""
+            if not name:
+                continue
+            if name not in groups:
+                question = ""
+                try:
+                    question = el.evaluate(_GROUP_QUESTION_JS)
+                except Exception:
+                    pass
+                groups[name] = {"name": name, "question": question,
+                                "required": False, "options": []}
+            try:
+                label = el.evaluate(_OPTION_LABEL_JS)
+            except Exception:
+                label = el.get_attribute("value") or ""
+            groups[name]["options"].append(
+                {"label": label, "value": el.get_attribute("value") or label})
+            if is_required(el):
+                groups[name]["required"] = True
+        except Exception:
+            continue
+    return [g for g in groups.values() if g["options"]]
 
 
 def list_file_inputs(page) -> list[str]:

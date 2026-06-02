@@ -24,6 +24,8 @@ from pathlib import Path
 
 from playwright.sync_api import sync_playwright
 
+import re
+
 from src.applicator import apply_url, build_field_rules, match_rule, policy_blocked
 from src.config import do_not_automate
 from src.models import Job, JobStatus
@@ -40,7 +42,30 @@ def log(msg: str):
     print(f"[apply_runner] {msg}", flush=True)
 
 
-def fill_form(page, rules, resume_pdf: str) -> dict:
+_STOPWORDS = {"the", "a", "an", "of", "to", "is", "are", "do", "you", "your", "i",
+              "we", "and", "or", "in", "on", "at", "for", "this", "that", "with",
+              "have", "has", "now", "future", "date", "please", "select", "if",
+              "would", "be", "able", "can", "will"}
+
+
+def _words(s: str) -> set:
+    return {w for w in re.findall(r"[a-z0-9]+", (s or "").lower())} - _STOPWORDS
+
+
+def _label_matches(a: str, b: str) -> bool:
+    """Loose match between a saved question and a form label (both directions)."""
+    a, b = (a or "").lower().strip(), (b or "").lower().strip()
+    if not a or not b:
+        return False
+    if a in b or b in a:
+        return True
+    aw, bw = _words(a), _words(b)
+    if not aw or not bw:
+        return False
+    return len(aw & bw) / min(len(aw), len(bw)) >= 0.6
+
+
+def fill_form(page, rules, custom_answers, resume_pdf: str) -> dict:
     filled, attached = [], False
     elements = page.query_selector_all("input, textarea, select")
     log(f"found {len(elements)} form fields")
@@ -56,7 +81,7 @@ def fill_form(page, rules, resume_pdf: str) -> dict:
         except Exception:
             continue
 
-    # 2) Text / select / yes-no fields via label matching.
+    # 2) Text / select fields via profile-rule label matching.
     for el in elements:
         try:
             tag = el.evaluate("e => e.tagName.toLowerCase()")
@@ -72,6 +97,27 @@ def fill_form(page, rules, resume_pdf: str) -> dict:
                 filled.append(rule["patterns"][0])
         except Exception:
             continue
+
+    # 3) Confirmed free-text answers (essay questions) -> text / textarea by question.
+    #    Single-choice questions are left for the human to answer during review.
+    for qa in (custom_answers or []):
+        q, ans = qa.get("question", ""), qa.get("answer", "")
+        if not q or not ans:
+            continue
+        for el in elements:
+            try:
+                tag = el.evaluate("e => e.tagName.toLowerCase()")
+                etype = (el.get_attribute("type") or "").lower()
+                if etype in ("file", "hidden", "submit", "button", "checkbox", "radio"):
+                    continue
+                if not _label_matches(q, field_key(el)):
+                    continue
+                ok = fill_select(el, ans) if tag == "select" else fill_text(el, ans)
+                if ok:
+                    filled.append(q)
+                break
+            except Exception:
+                continue
 
     return {"filled": filled, "resume_attached": attached}
 
@@ -108,6 +154,7 @@ def main():
     payload = json.loads(Path(sys.argv[1]).read_text())
     job = job_from_dict(payload["job"])
     profile = payload.get("profile") or {}
+    custom_answers = payload.get("custom_answers") or []
     status_out = payload.get("status_out")
 
     result = {"submitted": False, "saved_path": "", "message": "", "fill": {}}
@@ -143,7 +190,7 @@ def main():
                                      "can't auto-fill. Apply manually with the tailored resume.")
                 log(result["message"])
             else:
-                result["fill"] = fill_form(page, rules, job.tailored_pdf_path)
+                result["fill"] = fill_form(page, rules, custom_answers, job.tailored_pdf_path)
                 log("PRE-FILLED. Review the form in the browser, then click Submit. "
                     "(Close the window when done.)")
                 result["submitted"] = wait_for_submit(page, context)

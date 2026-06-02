@@ -71,6 +71,7 @@ def run_autofill(job: Job):
     payload = {
         "job": job.to_dict(),
         "profile": config.load_profile(),
+        "custom_answers": job.custom_answers,
         "status_out": str(status_out),
     }
     payload_path = tmp / "payload.json"
@@ -215,6 +216,12 @@ def render_jobs(ctx: AgentContext):
                                 f'<a href="app/static/{static_name}" target="_blank" '
                                 f'rel="noopener">🔗 Open saved resume in browser</a>',
                                 unsafe_allow_html=True)
+
+                    if job.custom_answers:
+                        with st.expander(f"📝 {len(job.custom_answers)} answer(s) ready to auto-fill"):
+                            for qa in job.custom_answers:
+                                st.markdown(f"**{qa.get('question','')}**")
+                                st.caption(qa.get("answer", ""))
 
                     blocked, block_reason = policy_blocked(job.ats, config.do_not_automate())
                     if not blocked:
